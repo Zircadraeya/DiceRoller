@@ -36,10 +36,6 @@
                         Dice:
                         <input @bind="dice" />
                     </label>
-                    <label>
-                        Modifier:
-                        <input @bind="mod" />
-                    </label>
                     <button @onclick="Roll" disabled="@(!IsDiceHubConnected)">Roll</button>
                 </div>
                 @{
@@ -52,21 +48,18 @@
                         <th>Total</th>
                         <th>Result</th>
                         <th>Dice</th>
-                        <th>Mod</th>
                     </tr>
                     <tr>
-                        <td>New roll</td>
+                        <td>New</td>
                         <td>@(!string.IsNullOrEmpty(roll.Request) ? roll.Total.ToString() : "")</td>
                         <td>@string.Join(", ", roll.Result)</td>
                         <td>@roll.Request</td>
-                        <td>@(!string.IsNullOrEmpty(roll.Request) ? roll.Modifier.ToString() : "")</td>
                     </tr>
                     <tr>
-                        <td>Previous roll</td>
+                        <td>Old</td>
                         <td>@(!string.IsNullOrEmpty(previous.Request) ? previous.Total.ToString() : "")</td>
                         <td>@string.Join(", ", previous.Result)</td>
                         <td>@previous.Request</td>
-                        <td>@(!string.IsNullOrEmpty(previous.Request) ? previous.Modifier.ToString() : "")</td>
                     </tr>
                 </table>
             </div>
@@ -78,14 +71,12 @@
 @code {
     private HubConnection playerHubConnection;
     private HubConnection diceHubConnection;
-    private List<string> messages = new List<string>();
     private List<PlayerModel> playerList = new List<PlayerModel>();
     private string playerName;
     private string characterName;
     private Dictionary<string, Roll> rollResults = new Dictionary<string, Roll>();
     private Dictionary<string, Roll> previousRollResults = new Dictionary<string, Roll>();
     private string dice;
-    private int mod;
     private ElementReference playerInfo;
 
     protected override async Task OnInitializedAsync()
@@ -128,10 +119,11 @@
 
     private void Roll()
     {
-        var regex = new System.Text.RegularExpressions.Regex(@"\d+d\d+");
-        if (regex.IsMatch(dice))
+        var regex = new System.Text.RegularExpressions.Regex(@"(?<diceCount>[0-9]+)d(?<diceValue>[0-9]+)(?<diceMod>([\+\-][0-9]+))?");
+        var match = regex.Match(dice);
+        if (match.Success)
         {
-            diceHubConnection.SendAsync("RollDice", GetPlayer, dice, mod);
+            diceHubConnection.SendAsync("RollDice", GetPlayer, dice);
         }
     }
 

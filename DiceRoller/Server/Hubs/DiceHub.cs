@@ -7,10 +7,13 @@ namespace DiceRoller.Server.Hubs
 {
     public class DiceHub : Hub
     {
-        public async Task RollDice(PlayerModel player, string request, int mod)
+        public async Task RollDice(PlayerModel player, string request)
         {
-            var number = int.Parse(request.Split('d')[0]);
-            var sides = int.Parse(request.Split('d')[1]);
+            var regex = new System.Text.RegularExpressions.Regex(@"(?<diceCount>[0-9]+)d(?<diceValue>[0-9]+)(?<diceMod>([\+\-][0-9]+))?");
+            var match = regex.Match(request);
+            var number = int.Parse(match.Groups["diceCount"].Value);
+            var sides = int.Parse(match.Groups["diceValue"].Value);
+            var mod = match.Groups["diceMod"].Success ? int.Parse(match.Groups["diceMod"].Value) : 0;
             var results = new List<int>();
             for (int i = 0; i < number; i++)
             {
