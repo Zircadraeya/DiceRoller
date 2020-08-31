@@ -1,0 +1,151 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.SignalR.Client
+@using DiceRoller.Shared;
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+<div @ref="playerInfo">
+    <div class="form-group">
+        <label>
+            Player name:
+            <input @bind="playerName" />
+        </label>
+    </div>
+    <div class="form-group">
+        <label>
+            Character name:
+            <input @bind="characterName" size="50" />
+        </label>
+    </div>
+    <button @onclick="Join" disabled="@(!IsPlayerHubConnected)">Join</button>
+</div>
+
+<div class="row">
+    @foreach (var player in playerList)
+    {
+        <div class="col-4">
+            <div class="card">
+                <div class="card-header">
+                    <p>@player.PlayerName</p>
+                    <h1>@player.CharacterName</h1>
+                </div>
+                <div class="card-body">
+                    <div class="form-group" style="@(player == GetPlayer ? "" : "display: none;")">
+                        <label>
+                            Dice:
+                            <input @bind="dice" />
+                        </label>
+                        <label>
+                            Modifier:
+                            <input @bind="mod" />
+                        </label>
+                        <button @onclick="Roll" disabled="@(!IsDiceHubConnected)">Roll</button>
+                    </div>
+                    @{
+                        var roll = GetPlayerResults(rollResults, player.Id);
+                        var previous = GetPlayerResults(previousRollResults, player.Id);
+                    }
+                    <table class="table">
+                        <tr>
+                            <th></th>
+                            <th>Total</th>
+                            <th>Result</th>
+                            <th>Dice</th>
+                            <th>Mod</th>
+                        </tr>
+                        <tr>
+                            <td>New roll</td>
+                            <td>@(!string.IsNullOrEmpty(roll.Request) ? roll.Total.ToString() : "")</td>
+                            <td>@string.Join(", ", roll.Result)</td>
+                            <td>@roll.Request</td>
+                            <td>@(!string.IsNullOrEmpty(roll.Request) ? roll.Modifier.ToString() : "")</td>
+                        </tr>
+                        <tr>
+                            <td>Previous roll</td>
+                            <td>@(!string.IsNullOrEmpty(previous.Request) ? previous.Total.ToString() : "")</td>
+                            <td>@string.Join(", ", previous.Result)</td>
+                            <td>@previous.Request</td>
+                            <td>@(!string.IsNullOrEmpty(previous.Request) ? previous.Modifier.ToString() : "")</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private HubConnection playerHubConnection;
+    private HubConnection diceHubConnection;
+    private List<string> messages = new List<string>();
+    private List<PlayerModel> playerList = new List<PlayerModel>();
+    private string playerName;
+    private string characterName;
+    private Dictionary<string, Roll> rollResults = new Dictionary<string, Roll>();
+    private Dictionary<string, Roll> previousRollResults = new Dictionary<string, Roll>();
+    private string dice;
+    private int mod;
+    private ElementReference playerInfo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        playerHubConnection = new HubConnectionBuilder()
+        .WithUrl(NavigationManager.ToAbsoluteUri("/playerhub"))
+        .Build();
+
+        playerHubConnection.On<List<PlayerModel>>("PlayersChanged", (players) =>
+        {
+            playerList = players;
+            StateHasChanged();
+        });
+
+        await playerHubConnection.StartAsync();
+
+        diceHubConnection = new HubConnectionBuilder()
+        .WithUrl(NavigationManager.ToAbsoluteUri("/dicehub"))
+        .Build();
+
+        diceHubConnection.On<PlayerModel, Roll>("DiceRolled", (player, roll) =>
+        {
+            previousRollResults.Remove(player.Id);
+            previousRollResults.Add(player.Id, GetPlayerResults(rollResults, player.Id));
+            rollResults.Remove(player.Id);
+            rollResults.Add(player.Id, roll);
+            StateHasChanged();
+        });
+
+        await diceHubConnection.StartAsync();
+    }
+
+    private void Join()
+    {
+        JSRuntime.InvokeVoidAsync("hideElement", playerInfo);
+        playerHubConnection.SendAsync("Join", playerName, characterName);
+    }
+
+    private PlayerModel GetPlayer => playerList.First(p => p.PlayerName == playerName && p.CharacterName == characterName);
+
+    Task Roll() => diceHubConnection.SendAsync("RollDice", GetPlayer, dice, mod);
+
+    public bool IsPlayerHubConnected =>
+    playerHubConnection.State == HubConnectionState.Connected;
+
+    public bool IsDiceHubConnected =>
+        diceHubConnection.State == HubConnectionState.Connected;
+
+    private Roll GetPlayerResults(Dictionary<string, Roll> dict, string playerId)
+    {
+        if (dict.TryGetValue(playerId, out var playerResults))
+        {
+            return playerResults;
+        }
+        return new Roll();
+    }
+
+    public void Dispose()
+    {
+        _ = playerHubConnection.DisposeAsync();
+        _ = diceHubConnection.DisposeAsync();
+    }
+}
