@@ -24,54 +24,54 @@
 <div class="row">
     @foreach (var player in playerList)
     {
-        <div class="col-4">
-            <div class="card">
-                <div class="card-header">
-                    <p>@player.PlayerName</p>
-                    <h1>@player.CharacterName</h1>
+    <div class="col-lg-4 col-sm-12">
+        <div class="card">
+            <div class="card-header">
+                <p>@player.PlayerName</p>
+                <h1>@player.CharacterName</h1>
+            </div>
+            <div class="card-body">
+                <div class="form-group" style="@(player == GetPlayer ? "" : "display: none;")">
+                    <label>
+                        Dice:
+                        <input @bind="dice" />
+                    </label>
+                    <label>
+                        Modifier:
+                        <input @bind="mod" />
+                    </label>
+                    <button @onclick="Roll" disabled="@(!IsDiceHubConnected)">Roll</button>
                 </div>
-                <div class="card-body">
-                    <div class="form-group" style="@(player == GetPlayer ? "" : "display: none;")">
-                        <label>
-                            Dice:
-                            <input @bind="dice" />
-                        </label>
-                        <label>
-                            Modifier:
-                            <input @bind="mod" />
-                        </label>
-                        <button @onclick="Roll" disabled="@(!IsDiceHubConnected)">Roll</button>
-                    </div>
-                    @{
+                @{
                         var roll = GetPlayerResults(rollResults, player.Id);
                         var previous = GetPlayerResults(previousRollResults, player.Id);
-                    }
-                    <table class="table">
-                        <tr>
-                            <th></th>
-                            <th>Total</th>
-                            <th>Result</th>
-                            <th>Dice</th>
-                            <th>Mod</th>
-                        </tr>
-                        <tr>
-                            <td>New roll</td>
-                            <td>@(!string.IsNullOrEmpty(roll.Request) ? roll.Total.ToString() : "")</td>
-                            <td>@string.Join(", ", roll.Result)</td>
-                            <td>@roll.Request</td>
-                            <td>@(!string.IsNullOrEmpty(roll.Request) ? roll.Modifier.ToString() : "")</td>
-                        </tr>
-                        <tr>
-                            <td>Previous roll</td>
-                            <td>@(!string.IsNullOrEmpty(previous.Request) ? previous.Total.ToString() : "")</td>
-                            <td>@string.Join(", ", previous.Result)</td>
-                            <td>@previous.Request</td>
-                            <td>@(!string.IsNullOrEmpty(previous.Request) ? previous.Modifier.ToString() : "")</td>
-                        </tr>
-                    </table>
-                </div>
+                }
+                <table class="table table-condensed">
+                    <tr>
+                        <th></th>
+                        <th>Total</th>
+                        <th>Result</th>
+                        <th>Dice</th>
+                        <th>Mod</th>
+                    </tr>
+                    <tr>
+                        <td>New roll</td>
+                        <td>@(!string.IsNullOrEmpty(roll.Request) ? roll.Total.ToString() : "")</td>
+                        <td>@string.Join(", ", roll.Result)</td>
+                        <td>@roll.Request</td>
+                        <td>@(!string.IsNullOrEmpty(roll.Request) ? roll.Modifier.ToString() : "")</td>
+                    </tr>
+                    <tr>
+                        <td>Previous roll</td>
+                        <td>@(!string.IsNullOrEmpty(previous.Request) ? previous.Total.ToString() : "")</td>
+                        <td>@string.Join(", ", previous.Result)</td>
+                        <td>@previous.Request</td>
+                        <td>@(!string.IsNullOrEmpty(previous.Request) ? previous.Modifier.ToString() : "")</td>
+                    </tr>
+                </table>
             </div>
         </div>
+    </div>
     }
 </div>
 
@@ -126,7 +126,14 @@
 
     private PlayerModel GetPlayer => playerList.First(p => p.PlayerName == playerName && p.CharacterName == characterName);
 
-    Task Roll() => diceHubConnection.SendAsync("RollDice", GetPlayer, dice, mod);
+    private void Roll()
+    {
+        var regex = new System.Text.RegularExpressions.Regex(@"\d+d\d+");
+        if (regex.IsMatch(dice))
+        {
+            diceHubConnection.SendAsync("RollDice", GetPlayer, dice, mod);
+        }
+    }
 
     public bool IsPlayerHubConnected =>
     playerHubConnection.State == HubConnectionState.Connected;
